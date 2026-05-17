@@ -16,15 +16,8 @@ Base.metadata.create_all(engine)
 
 def add_product(products):
     session.add_all(products)
+    session.commit()
 
 def pull_products():
     products = session.query(Product).all()
     return products
-
-
-
-
-
-
-
-
