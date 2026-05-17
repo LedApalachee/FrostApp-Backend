@@ -12,8 +12,6 @@ def get_item_names_by_qrraw(qrraw: str) -> list[str]:
     items_db = []
     rbody = {"token":api_key, "qrraw":qrraw}
     r = requests.post(api_url, data=rbody)
-    print("\n\n\nljl")
-    print(r.json())
     for item in r.json()['data']['json']['items']:
         # формируем список названий товаров для отправки на фронт
         item_names += [item['name']]
