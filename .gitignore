@@ -2,3 +2,4 @@
 __pycache__
 .env
 src/*.db
+.DS_Store
