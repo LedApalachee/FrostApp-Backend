@@ -1,4 +1,8 @@
 *.code-workspace
 __pycache__
 .env
+.venv
+.postman
+postman
+*.db
 src/*.db
