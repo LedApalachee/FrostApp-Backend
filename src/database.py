@@ -44,7 +44,15 @@ Base.metadata.create_all(engine)
 
 
 def find_by_email(email: str):
-    return session.query(User).filter(User.email == email).first()
+    user = session.query(User).filter(User.email == email).first()
+    if not user:
+        return None
+    return {
+        "id": user.id,
+        "name": user.user_name,
+        "email": user.email,
+        "passhash": user.password,
+    }
 
 
 def create_user(username: str, email: str, passhash: str):
@@ -55,7 +63,10 @@ def create_user(username: str, email: str, passhash: str):
 
 
 def get_user(user_id: int):
-    return session.query(User).filter(User.id == user_id).first()
+    user = session.query(User).filter(User.id == user_id).first()
+    if not user:
+        return None
+    return {"id": user.id, "name": user.user_name, "email": user.email}
 
 
 def add_items(user_id: int, items: list):
@@ -73,7 +84,7 @@ def add_items(user_id: int, items: list):
                 try:
                     expiration_date = datetime.strptime(expiration_s, "%Y-%m-%d")
                 except ValueError:
-                    return "BAD FROMAT!"
+                    expiration_date = None
 
         new_product = Product(
             user_id=user_id,
@@ -88,7 +99,24 @@ def add_items(user_id: int, items: list):
 
 
 def get_items(user_id: int) -> list:
-    return session.query(Product).filter(Product.user_id == user_id).all()
+    products = session.query(Product).filter(Product.user_id == user_id).all()
+
+    result = []
+    for product in products:
+        result.append(
+            {
+                "id": product.id,
+                "user_id": product.user_id,
+                "name": product.name,
+                "expiration": (
+                    product.expiration.strftime("%Y-%m-%d")
+                    if product.expiration
+                    else None
+                ),
+                "deleted": product.deleted,
+            }
+        )
+    return result
 
 
 def items_to_delete(item_ids: list[int]):
@@ -100,3 +128,15 @@ def items_to_delete(item_ids: list[int]):
 
     session.commit()
     return f"{updated_count} items deleted"
+
+
+"""
+def check_all_users_in_db():
+    users = session.query(User).all()
+    print("\n=== СПИСОК ВСЕХ ПОЛЬЗОВАТЕЛЕЙ В БД ===")
+    for u in users:
+        print(u.id, u.user_name, u.email)
+    print("======================================\n")
+
+check_all_users_in_db()
+"""
