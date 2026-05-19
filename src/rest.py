@@ -2,6 +2,7 @@ from fastapi import FastAPI, Body
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import database as db
+import parsing_products
 import qr
 import jwt
 import os
@@ -96,7 +97,7 @@ def add_items(newitems: NewItems):
 @app.post("/qr-text")
 def scan_qrtext(qrdata: QRText):
     if qrdata.token == jwt.encode({"user_id": qrdata.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"):
-        return qr.get_item_names_by_qrraw(qrdata.qrraw)
+        return parsing_products.parse(qr.get_item_names_by_qrraw(qrdata.qrraw))
     return {"message": "bad token"}
 
 
