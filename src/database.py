@@ -24,6 +24,7 @@ class User(Base):
     password = Column(String, nullable=False)
 
     products = relationship("Product", back_populates="user")
+    history = relationship("Histories", back_populates="user")
 
 
 ## замените пж password на что-то другое если надо, я хз
@@ -38,6 +39,15 @@ class Product(Base):
     deleted = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="products")
+
+
+class Histories(Base):
+    __tablename__ = "history"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    qr = Column(String, nullable=False)
+
+    user = relationship("User", back_populates="history")
 
 
 Base.metadata.create_all(engine)
@@ -137,6 +147,7 @@ def check_all_users_in_db():
     for u in users:
         print(u.id, u.user_name, u.email)
     print("======================================\n")
+
 
 check_all_users_in_db()
 """

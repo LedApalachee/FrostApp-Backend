@@ -7,3 +7,4 @@ postman
 *.db
 src/*.db
 .DS_Store
+aisrc/*.json
