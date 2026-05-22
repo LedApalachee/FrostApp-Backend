@@ -20,7 +20,7 @@ session = Session()
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
-    user_name = Column(String, nullable=False, unique=True)
+    user_name = Column(String, nullable=False, unique=True) ## Убрать потом unique
     email = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
 
@@ -153,6 +153,10 @@ def get_items(user_id: int) -> list:
         )
     return result
 
+def update_items():
+    update_count = ()
+    
+    return update_count
 
 def items_to_delete(item_ids: list[int]):
     updated_count = (
@@ -163,7 +167,6 @@ def items_to_delete(item_ids: list[int]):
 
     session.commit()
     return f"{updated_count} items deleted"
-
 
 """
 def check_all_users_in_db():
