@@ -36,6 +36,7 @@ class Product(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     name = Column(String, nullable=False)
+    category = Column(String, default=None)
     expiration = Column(DateTime, nullable=True)
     quantity = Column(Float, nullable=False)
     unit = Column(String, nullable=False)
@@ -88,6 +89,8 @@ def add_items(user_id: int, items: list):
         return "user not found"
 
     for item in items:
+        category_s = item.get("category")
+
         expiration_s = item.get("expiration")
         expiration_date = None
 
@@ -115,6 +118,7 @@ def add_items(user_id: int, items: list):
         new_product = Product(
             user_id=user_id,
             name=item["name"],
+            category=category_s,
             expiration=expiration_date,
             quantity=quantity_stn,
             unit=unit_base,
@@ -136,6 +140,7 @@ def get_items(user_id: int) -> list:
                 "id": product.id,
                 "user_id": product.user_id,
                 "name": product.name,
+                "category": product.category,
                 "expiration": (
                     product.expiration.strftime("%Y-%m-%d")
                     if product.expiration
