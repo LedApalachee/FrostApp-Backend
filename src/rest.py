@@ -13,19 +13,23 @@ class QRText(BaseModel):
     qrraw: str
     token: str
 
+
 class Register(BaseModel):
     name: str
     email: str
     password: str
 
+
 class Login(BaseModel):
     email: str
     password: str
+
 
 class NewItems(BaseModel):
     user_id: int
     items: list
     token: str
+
 
 class DropItems(BaseModel):
     item_ids: list[int]
@@ -46,20 +50,24 @@ def new_user(user: Register):
     return {
         "message": "success",
         "user_id": user_id,
-        "token": jwt.encode({"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256")
+        "token": jwt.encode(
+            {"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
+        ),
     }
 
 
 @app.get("/users")
 def get_user(user_id: int, token: str):
-    if token != jwt.encode({"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"):
+    if token != jwt.encode(
+        {"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
+    ):
         return {"message": "bad token"}
     user = db.get_user(user_id)
     if not user:
         return {"message": "user not found"}
     return {
         "message": "success",
-        "user": {"id": user["id"], "name": user["name"], "email": user["email"]}
+        "user": {"id": user["id"], "name": user["name"], "email": user["email"]},
     }
 
 
@@ -71,7 +79,9 @@ def login(login_form: Login):
         return {
             "message": "success",
             "user_id": user["id"],
-            "token": jwt.encode({"user_id": user["id"]}, os.getenv("SECRET_KEY"), algorithm="HS256")
+            "token": jwt.encode(
+                {"user_id": user["id"]}, os.getenv("SECRET_KEY"), algorithm="HS256"
+            ),
         }
     return {"message": "incorrect"}
 
@@ -79,7 +89,9 @@ def login(login_form: Login):
 # Список продуктов данного пользователя
 @app.get("/items")
 def get_items(user_id: int, token: str):
-    if token == jwt.encode({"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"):
+    if token == jwt.encode(
+        {"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
+    ):
         return {"items": db.get_items(user_id)}
     return {"message": "bad token"}
 
@@ -87,7 +99,9 @@ def get_items(user_id: int, token: str):
 # Добавить продукты этого пользователя
 @app.post("/items")
 def add_items(newitems: NewItems):
-    if newitems.token == jwt.encode({"user_id": newitems.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"):
+    if newitems.token == jwt.encode(
+        {"user_id": newitems.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
+    ):
         db.add_items(newitems.user_id, newitems.items)
         return {"message": "success"}
     return {"message": "bad token"}
@@ -96,7 +110,9 @@ def add_items(newitems: NewItems):
 # Сканировать QR-код этого пользователя
 @app.post("/qr-text")
 def scan_qrtext(qrdata: QRText):
-    if qrdata.token == jwt.encode({"user_id": qrdata.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"):
+    if qrdata.token == jwt.encode(
+        {"user_id": qrdata.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
+    ):
         return parsing_products.parse(qr.get_item_names_by_qrraw(qrdata.qrraw))
     return {"message": "bad token"}
 
@@ -104,6 +120,8 @@ def scan_qrtext(qrdata: QRText):
 # Удалить данные продукты
 @app.post("/items/delete")
 def delete_items(dropitems: DropItems):
-    if dropitems.token == jwt.encode({"user_id": dropitems.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"):
+    if dropitems.token == jwt.encode(
+        {"user_id": dropitems.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
+    ):
         return {"message": db.items_to_delete(dropitems.item_ids)}
     return {"message": "bad token"}

@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Boolean,
+    Float,
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from datetime import datetime
@@ -36,6 +37,8 @@ class Product(Base):
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     name = Column(String, nullable=False)
     expiration = Column(DateTime, nullable=True)
+    quantity = Column(Float, nullable=False)
+    unit = Column(String, nullable=False)
     deleted = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="products")
@@ -87,6 +90,13 @@ def add_items(user_id: int, items: list):
     for item in items:
         expiration_s = item.get("expiration")
         expiration_date = None
+
+        quantity_s = item.get("quantity")
+        quantity_stn = 1.0
+
+        unit_s = item.get("unit")
+        unit_base = unit_s if unit_s else "шт"
+
         if expiration_s:
             try:
                 expiration_date = datetime.fromisoformat(expiration_s)
@@ -96,10 +106,18 @@ def add_items(user_id: int, items: list):
                 except ValueError:
                     expiration_date = None
 
+        if quantity_s:
+            try:
+                quantity_stn = float(quantity_s)
+            except ValueError:
+                quantity_stn = 1.0
+
         new_product = Product(
             user_id=user_id,
             name=item["name"],
             expiration=expiration_date,
+            quantity=quantity_stn,
+            unit=unit_base,
             deleted=False,
         )
         session.add(new_product)
@@ -123,6 +141,8 @@ def get_items(user_id: int) -> list:
                     if product.expiration
                     else None
                 ),
+                "quantity": product.quantity,
+                "unit": product.unit,
                 "deleted": product.deleted,
             }
         )
