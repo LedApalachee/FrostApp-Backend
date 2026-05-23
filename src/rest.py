@@ -56,6 +56,7 @@ def new_user(user: Register):
     }
 
 
+# Поиск пользователя по userID
 @app.get("/users")
 def get_user(user_id: int, token: str):
     if token != jwt.encode(
@@ -113,11 +114,18 @@ def scan_qrtext(qrdata: QRText):
     if qrdata.token == jwt.encode(
         {"user_id": qrdata.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
     ):
-        return parsing_products.parse(qr.get_item_names_by_qrraw(qrdata.qrraw))
+        res = qr.get_items_by_qrraw(qrdata.qrraw)
+        if res["successful"]:
+            return {
+                "message": "success",
+                "items": parsing_products.extract_unit(res["items"]),
+            }
+        else:
+            return {"message": res["errorname"]}
     return {"message": "bad token"}
 
 
-# Удалить данные продукты
+# Удалить указанные продукты
 @app.post("/items/delete")
 def delete_items(dropitems: DropItems):
     if dropitems.token == jwt.encode(
