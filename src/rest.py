@@ -131,5 +131,18 @@ def delete_items(dropitems: DropItems):
     if dropitems.token == jwt.encode(
         {"user_id": dropitems.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
     ):
-        return {"message": db.items_to_delete(dropitems.item_ids)}
+        return {"message": db.items_to_delete(dropitems.user_id,dropitems.item_ids)}
     return {"message": "bad token"}
+
+class UPDItems(BaseModel):
+    user_id: int
+    token: str
+    items_upd: list[tuple[int,dict]]
+
+@app.put("/items")
+def update(upditems:UPDItems):
+    if upditems.token == jwt.encode(
+        {"user_id":upditems.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
+    ):
+        return {"message": db.update_items(upditems.user_id, upditems.items_upd)}
+    return {"message":"bad token"}

@@ -20,7 +20,7 @@ session = Session()
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
-    user_name = Column(String, nullable=False, unique=True) ## Убрать потом unique
+    user_name = Column(String, nullable=False, unique=True)  ## Убрать потом unique
     email = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
 
@@ -153,20 +153,53 @@ def get_items(user_id: int) -> list:
         )
     return result
 
-def update_items():
-    update_count = ()
-    
-    return update_count
 
-def items_to_delete(item_ids: list[int]):
+def items_to_delete(user_id: int, item_ids: list[int]):
     updated_count = (
         session.query(Product)
-        .filter(Product.id.in_(item_ids))
+        .filter(Product.id.in_(item_ids), Product.user_id == user_id)
         .update({Product.deleted: True}, synchronize_session="fetch")
     )
-
     session.commit()
     return f"{updated_count} items deleted"
+
+
+def update_items(user_id: int, items_upd: list) -> str:
+    updated_count = 0
+
+    for item_id, changes in items_upd:
+        # защита от негодяев
+        changes.pop("id", None)
+        changes.pop("user_id", None)
+        changes.pop("deleted", None)
+
+        expiration_s = changes.get("expiration")
+        expiration_date = None
+
+        if expiration_s:
+            try:
+                expiration_date = datetime.fromisoformat(expiration_s)
+            except ValueError:
+                try:
+                    expiration_date = datetime.strptime(expiration_s, "%Y-%m-%d")
+                except ValueError:
+                    expiration_date = None
+
+        changes["expiration"] = expiration_date
+
+        product = (
+            session.query(Product)
+            .filter(Product.id == item_id, Product.user_id == user_id)
+            .first()
+        )
+
+        if product:
+            session.query(Product).filter(Product.id == item_id).update(changes)
+            updated_count += 1
+
+    session.commit()
+    return f"{updated_count} items updated"
+
 
 """
 def check_all_users_in_db():
