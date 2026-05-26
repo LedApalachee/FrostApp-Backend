@@ -20,15 +20,12 @@ session = Session()
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
-    user_name = Column(String, nullable=False, unique=True)  ## Убрать потом unique
+    user_name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
 
     products = relationship("Product", back_populates="user")
     history = relationship("Histories", back_populates="user")
-
-
-## замените пж password на что-то другое если надо, я хз
 
 
 class Product(Base):
