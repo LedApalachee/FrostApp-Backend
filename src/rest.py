@@ -6,6 +6,7 @@ import qr
 import jwt
 import os
 from rest_models import QRText, Register, Login, NewItems, DropItems, UPDItems
+import mail_verific
 
 
 app = FastAPI()
@@ -17,14 +18,24 @@ load_dotenv()
 def new_user(user: Register):
     if db.find_by_email(user.email):
         return {"message": "email exists"}
-    user_id = db.create_user(user.name, user.email, user.password)
-    return {
-        "message": "success",
-        "user_id": user_id,
-        "token": jwt.encode(
-            {"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
-        ),
-    }
+    mail_verific.send_code(user)
+    return {"message": "vercode sent"}
+
+
+# Подтверждение почты
+@app.get("/users/verify")
+def verify_mail(email: str, vercode: str):
+    user = mail_verific.verify(email, vercode)
+    if user:
+        user_id = db.create_user(user.name, user.email, user.password)
+        return {
+            "message": "success",
+            "user_id": user_id,
+            "token": jwt.encode(
+                {"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
+            )
+        }
+    return {"message": "incorrect"}
 
 
 # Поиск пользователя по userID
@@ -64,7 +75,7 @@ def get_items(user_id: int, token: str):
     if token == jwt.encode(
         {"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
     ):
-        return {"items": db.get_items(user_id)}
+        return {"message": "success", "items": db.get_items(user_id)}
     return {"message": "bad token"}
 
 
