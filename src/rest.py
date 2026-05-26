@@ -1,46 +1,11 @@
 from fastapi import FastAPI, Body
-from pydantic import BaseModel
 from dotenv import load_dotenv
 import database as db
 import parsing_products
 import qr
 import jwt
 import os
-
-
-class QRText(BaseModel):
-    user_id: int
-    qrraw: str
-    token: str
-
-
-class Register(BaseModel):
-    name: str
-    email: str
-    password: str
-
-
-class Login(BaseModel):
-    email: str
-    password: str
-
-
-class NewItems(BaseModel):
-    user_id: int
-    items: list
-    token: str
-
-
-class DropItems(BaseModel):
-    item_ids: list[int]
-    user_id: int
-    token: str
-
-
-class UPDItems(BaseModel):
-    user_id: int
-    token: str
-    items_upd: list[tuple[int,dict]]
+from rest_models import QRText, Register, Login, NewItems, DropItems, UPDItems
 
 
 app = FastAPI()
