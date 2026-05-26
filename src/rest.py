@@ -37,6 +37,12 @@ class DropItems(BaseModel):
     token: str
 
 
+class UPDItems(BaseModel):
+    user_id: int
+    token: str
+    items_upd: list[tuple[int,dict]]
+
+
 app = FastAPI()
 load_dotenv()
 
@@ -134,11 +140,8 @@ def delete_items(dropitems: DropItems):
         return {"message": db.items_to_delete(dropitems.user_id,dropitems.item_ids)}
     return {"message": "bad token"}
 
-class UPDItems(BaseModel):
-    user_id: int
-    token: str
-    items_upd: list[tuple[int,dict]]
 
+# Обновление данных продуктов
 @app.put("/items")
 def update(upditems:UPDItems):
     if upditems.token == jwt.encode(
