@@ -8,6 +8,7 @@ from sqlalchemy import (
     Boolean,
     Float,
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from datetime import datetime
 
@@ -67,10 +68,16 @@ def find_by_email(email: str):
 
 
 def create_user(username: str, email: str, passhash: str):
-    new_user = User(user_name=username, email=email, password=passhash)
-    session.add(new_user)
-    session.commit()
-    return new_user.id
+    try:
+        new_user = User(user_name=username, email=email, password=passhash)
+        session.add(new_user)
+        session.commit()
+        return new_user.id
+    except IntegrityError:
+        session.rollback()
+        return "exists"
+    except:
+        return None
 
 
 def get_user(user_id: int):
