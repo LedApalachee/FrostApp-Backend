@@ -3,7 +3,6 @@ from email.message import EmailMessage
 from dotenv import load_dotenv
 import os
 import secrets
-from rest_models import Register
 
 load_dotenv()
 sender = os.getenv("SENDER_EMAIL")
@@ -13,28 +12,28 @@ mail_password = os.getenv("SENDER_PASSWORD")
 # когда почта верифицирована - из vercodes удаляется запись о ней
 vercodes = {}
 
-def send_code(user: Register):
+def send_code(email: str) -> str:
     global mail_password, vercodes
     vercode = ''.join(secrets.choice('0123456789') for _ in range(6))
     msg = EmailMessage()
-    msg.set_content(f"Hi, {user.name}! Your verification code is {vercode}")
-    msg["Subject"] = 'Your verification code for SmartFrost App'
+    msg.set_content(f"Hi! Your verification code is {vercode}")
+    msg["Subject"] = 'Verification code for SmartFrost App'
     msg["From"] = sender
-    msg["To"] = user.email
+    msg["To"] = email
     
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender, mail_password)
             server.send_message(msg)
-            vercodes[vercode] = user
+            vercodes[vercode] = email
             return "sent"
     except Exception as e:
         return "Error: {e}"
 
 
-def verify(email: str, vercode: str) -> Register | None:
+def verify(email: str, vercode: str) -> str | None:
     global vercodes
-    user = vercodes.pop(vercode, None)
-    if user and user.email != email:
-        return None
-    return user
+    if vercodes.get(vercode, None) == email:
+        vercodes.pop(vercode, None)
+        return "ok"
+    return None
