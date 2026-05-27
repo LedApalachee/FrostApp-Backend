@@ -2,15 +2,14 @@ from pydantic import BaseModel
 
 
 class QRText(BaseModel):
-    user_id: int
     qrraw: str
     token: str
 
 
-class Register(BaseModel):
+class NewUser(BaseModel):
     name: str
-    email: str
     password: str
+    token: str
 
 
 class Login(BaseModel):
@@ -19,18 +18,20 @@ class Login(BaseModel):
 
 
 class NewItems(BaseModel):
-    user_id: int
     items: list
     token: str
 
 
 class DropItems(BaseModel):
     item_ids: list[int]
-    user_id: int
     token: str
 
 
 class UPDItems(BaseModel):
-    user_id: int
     token: str
     items_upd: list[tuple[int,dict]]
+
+
+class CodeVerification(BaseModel):
+    email: str
+    code: str

@@ -1,56 +1,64 @@
-from fastapi import FastAPI, Body
-from dotenv import load_dotenv
+from fastapi import FastAPI
 import database as db
 import parsing_products
 import qr
-import jwt
-import os
-from rest_models import QRText, Register, Login, NewItems, DropItems, UPDItems
+from rest_models import *
 import mail_verific
-
+import tokens
+import bcrypt
 
 app = FastAPI()
-load_dotenv()
 
 
-# Регистрация нового пользователя
+# Создание нового пользователя
 @app.post("/users")
-def new_user(user: Register):
-    if db.find_by_email(user.email):
+def new_user(user: NewUser):
+    payload = tokens.verify(user.token)
+    if not payload or not payload.get("email", None):
+        return {"message": "bad token"}
+
+    user_id = db.create_user(user.name, payload["email"], bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt()))
+    if not user_id:
+        return {"message": "error"}
+    elif user_id == "exists":
         return {"message": "email exists"}
-    mail_verific.send_code(user)
-    return {"message": "vercode sent"}
+    
+    return {
+        "message": "success",
+        "token": tokens.generate({"user_id": user_id}, {"days": 90.0})
+    }
 
 
-# Подтверждение почты
-@app.get("/users/verify")
-def verify_mail(email: str, vercode: str):
-    user = mail_verific.verify(email, vercode)
-    if user:
-        user_id = db.create_user(user.name, user.email, user.password)
+# Создание кода подтверждения
+@app.get("/verification-code")
+def verification_code(email: str):
+    return {"message": mail_verific.send_code(email)}
+
+
+# Подтверждение кода
+@app.post("/verification-code")
+def verify(verif: CodeVerification):
+    if mail_verific.verify(verif.email, verif.code):
         return {
             "message": "success",
-            "user_id": user_id,
-            "token": jwt.encode(
-                {"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
-            )
+            "token": tokens.generate({"email": verif.email}, {"hours": 6.0})
         }
-    return {"message": "incorrect"}
+    return {"message": "invalid"}
 
 
-# Поиск пользователя по userID
+# Поиск пользователя по токену
 @app.get("/users")
-def get_user(user_id: int, token: str):
-    if token != jwt.encode(
-        {"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
-    ):
+def get_user(token: str):
+    payload = tokens.verify(token)
+    if not payload or not payload.get("user_id", None):
         return {"message": "bad token"}
-    user = db.get_user(user_id)
+
+    user = db.get_user(payload["user_id"])
     if not user:
         return {"message": "user not found"}
     return {
         "message": "success",
-        "user": {"id": user["id"], "name": user["name"], "email": user["email"]},
+        "user": {"name": user["name"], "email": user["email"]},
     }
 
 
@@ -58,70 +66,70 @@ def get_user(user_id: int, token: str):
 @app.post("/login")
 def login(login_form: Login):
     user = db.find_by_email(login_form.email)
-    if user and user["passhash"] == login_form.password:
+    if user and bcrypt.checkpw(login_form.password.encode("utf-8"), user['passhash']):
         return {
             "message": "success",
-            "user_id": user["id"],
-            "token": jwt.encode(
-                {"user_id": user["id"]}, os.getenv("SECRET_KEY"), algorithm="HS256"
-            ),
+            "token": tokens.generate({"user_id": user["id"]}, {"days": 90.0})
         }
     return {"message": "incorrect"}
 
 
 # Список продуктов данного пользователя
 @app.get("/items")
-def get_items(user_id: int, token: str):
-    if token == jwt.encode(
-        {"user_id": user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
-    ):
-        return {"message": "success", "items": db.get_items(user_id)}
-    return {"message": "bad token"}
+def get_items(token: str):
+    payload = tokens.verify(token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+
+    return {
+        "message": "success",
+        "items": db.get_items(payload["user_id"])
+    }
 
 
 # Добавить продукты этого пользователя
 @app.post("/items")
 def add_items(newitems: NewItems):
-    if newitems.token == jwt.encode(
-        {"user_id": newitems.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
-    ):
-        db.add_items(newitems.user_id, newitems.items)
-        return {"message": "success"}
-    return {"message": "bad token"}
+    payload = tokens.verify(newitems.token)
+    if not payload or not payload.get("user_id", None):
+         return {"message": "bad token"}
+    
+    db.add_items(payload["user_id"], newitems.items)
+    return {"message": "success"}
 
 
 # Сканировать QR-код этого пользователя
 @app.post("/qr-text")
 def scan_qrtext(qrdata: QRText):
-    if qrdata.token == jwt.encode(
-        {"user_id": qrdata.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
-    ):
-        res = qr.get_items_by_qrraw(qrdata.qrraw)
-        if res["successful"]:
-            return {
-                "message": "success",
-                "items": parsing_products.extract_unit(res["items"]),
-            }
-        else:
-            return {"message": res["errorname"]}
-    return {"message": "bad token"}
+    payload = tokens.verify(qrdata.token)
+    if not payload or not payload.get("user_id", None):
+         return {"message": "bad token"}
+    
+    res = qr.get_items_by_qrraw(qrdata.qrraw)
+    if res["successful"]:
+        return {
+            "message": "success",
+            "items": parsing_products.extract_unit(res["items"]),
+        }
+    else:
+        return {"message": res["errorname"]}
 
 
 # Удалить указанные продукты
 @app.post("/items/delete")
 def delete_items(dropitems: DropItems):
-    if dropitems.token == jwt.encode(
-        {"user_id": dropitems.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
-    ):
-        return {"message": db.items_to_delete(dropitems.user_id,dropitems.item_ids)}
-    return {"message": "bad token"}
+    payload = tokens.verify(dropitems.token)
+    if not payload or not payload.get("user_id", None):
+         return {"message": "bad token"}
+    
+    return {"message": db.items_to_delete(payload["user_id"],dropitems.item_ids)}
 
 
 # Обновление данных продуктов
 @app.put("/items")
 def update(upditems:UPDItems):
-    if upditems.token == jwt.encode(
-        {"user_id":upditems.user_id}, os.getenv("SECRET_KEY"), algorithm="HS256"
-    ):
-        return {"message": db.update_items(upditems.user_id, upditems.items_upd)}
-    return {"message":"bad token"}
+    payload = tokens.verify(upditems.token)
+    if not payload or not payload.get("user_id", None):
+         return {"message": "bad token"}
+    
+    return {"message": db.update_items(payload["user_id"], upditems.items_upd)}
