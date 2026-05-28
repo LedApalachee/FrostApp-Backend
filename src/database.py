@@ -77,6 +77,7 @@ def create_user(username: str, email: str, passhash: str):
         session.rollback()
         return "exists"
     except:
+        session.rollback()
         return None
 
 
@@ -84,7 +85,31 @@ def get_user(user_id: int):
     user = session.query(User).filter(User.id == user_id).first()
     if not user:
         return None
-    return {"id": user.id, "name": user.user_name, "email": user.email}
+    return {"id": user.id, "name": user.user_name, "email": user.email, "password": user.password}
+
+
+def update_user(user_id: int, newdata: dict):
+    newdata.pop("id", None) # id менять нельзя
+    
+    user = (
+        session.query(User)
+        .filter(User.id == user_id)
+        .first()
+    )
+
+    if not user:
+        return "user not found"
+    
+    try:
+        session.query(User).filter(User.id == user_id).update(newdata)
+        session.commit()
+        return "ok"
+    except IntegrityError:
+        session.rollback()
+        return "email exists"
+    except Exception as e:
+        session.rollback()
+        return f"error: {e}"
 
 
 def add_items(user_id: int, items: list):
