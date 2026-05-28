@@ -167,7 +167,6 @@ def get_items(user_id: int) -> list:
         result.append(
             {
                 "id": product.id,
-                "user_id": product.user_id,
                 "name": product.name,
                 "category": product.category,
                 "expiration": (

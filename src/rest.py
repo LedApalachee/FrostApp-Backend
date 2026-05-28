@@ -10,6 +10,51 @@ import bcrypt
 app = FastAPI()
 
 
+# Создание кода подтверждения
+@app.get("/verification-code")
+def verification_code(email: str):
+    return {"message": mail_verific.send_code(email)}
+
+
+# Подтверждение кода
+@app.post("/verification-code")
+def verify(verif: CodeVerification):
+    if mail_verific.verify(verif.email, verif.code):
+        return {
+            "message": "ok",
+            "token": tokens.generate({"email": verif.email}, {"hours": 6.0})
+        }
+    return {"message": "invalid"}
+
+
+# Логин
+@app.post("/login")
+def login(login_form: Login):
+    user = db.find_by_email(login_form.email)
+    if user and bcrypt.checkpw(login_form.password.encode("utf-8"), user['passhash']):
+        return {
+            "message": "ok",
+            "token": tokens.generate({"user_id": user["id"]}, {"days": 90.0})
+        }
+    return {"message": "incorrect"}
+
+
+# Поиск пользователя по токену
+@app.get("/users")
+def get_user(token: str):
+    payload = tokens.verify(token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+
+    user = db.get_user(payload["user_id"])
+    if not user:
+        return {"message": "user not found"}
+    return {
+        "message": "ok",
+        "user": {"name": user["name"], "email": user["email"]},
+    }
+
+
 # Создание нового пользователя
 @app.post("/users")
 def new_user(user: NewUser):
@@ -24,54 +69,46 @@ def new_user(user: NewUser):
         return {"message": "email exists"}
     
     return {
-        "message": "success",
+        "message": "ok",
         "token": tokens.generate({"user_id": user_id}, {"days": 90.0})
     }
 
 
-# Создание кода подтверждения
-@app.get("/verification-code")
-def verification_code(email: str):
-    return {"message": mail_verific.send_code(email)}
-
-
-# Подтверждение кода
-@app.post("/verification-code")
-def verify(verif: CodeVerification):
-    if mail_verific.verify(verif.email, verif.code):
-        return {
-            "message": "success",
-            "token": tokens.generate({"email": verif.email}, {"hours": 6.0})
-        }
-    return {"message": "invalid"}
-
-
-# Поиск пользователя по токену
-@app.get("/users")
-def get_user(token: str):
-    payload = tokens.verify(token)
+# Изменение данных пользователя: например, сменить имя, пароль или почту
+@app.put("/users/name")
+def update_user(user: NewUsername):
+    payload = tokens.verify(user.token)
     if not payload or not payload.get("user_id", None):
         return {"message": "bad token"}
+    
+    return {"message":  db.update_user(payload["user_id"], {"user_name": user.name})}
 
-    user = db.get_user(payload["user_id"])
-    if not user:
-        return {"message": "user not found"}
+@app.put("/users/password")
+def update_user(user: NewPassword):
+    payload = tokens.verify(user.token)
+    if not payload or not payload.get("email", None):
+        return {"message": "bad token"}
+    
+    userdb = db.find_by_email(payload["email"])
+    if not userdb:
+        return {"message": "no user with this email"}
     return {
-        "message": "success",
-        "user": {"name": user["name"], "email": user["email"]},
+        "message": db.update_user(
+            userdb["id"],
+            {"password": bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())}
+        )
     }
 
+@app.put("/users/email")
+def update_user(user: NewEmail):
+    userpayload = tokens.verify(user.user_token)
+    emailpayload = tokens.verify(user.email_token)
+    if not userpayload or not userpayload.get("user_id", None):
+        return {"message": "bad user token"}
+    if not emailpayload or not emailpayload.get("email", None):
+        return {"message": "bad email token"}
 
-# Логин
-@app.post("/login")
-def login(login_form: Login):
-    user = db.find_by_email(login_form.email)
-    if user and bcrypt.checkpw(login_form.password.encode("utf-8"), user['passhash']):
-        return {
-            "message": "success",
-            "token": tokens.generate({"user_id": user["id"]}, {"days": 90.0})
-        }
-    return {"message": "incorrect"}
+    return {"message":  db.update_user(userpayload["user_id"], {"email": emailpayload["email"]})}
 
 
 # Список продуктов данного пользователя
@@ -82,7 +119,7 @@ def get_items(token: str):
         return {"message": "bad token"}
 
     return {
-        "message": "success",
+        "message": "ok",
         "items": db.get_items(payload["user_id"])
     }
 
@@ -95,7 +132,7 @@ def add_items(newitems: NewItems):
          return {"message": "bad token"}
     
     db.add_items(payload["user_id"], newitems.items)
-    return {"message": "success"}
+    return {"message": "ok"}
 
 
 # Сканировать QR-код этого пользователя
@@ -108,7 +145,7 @@ def scan_qrtext(qrdata: QRText):
     res = qr.get_items_by_qrraw(qrdata.qrraw)
     if res["successful"]:
         return {
-            "message": "success",
+            "message": "ok",
             "items": parsing_products.extract_unit(res["items"]),
         }
     else:

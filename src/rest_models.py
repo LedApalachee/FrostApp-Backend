@@ -12,6 +12,21 @@ class NewUser(BaseModel):
     token: str
 
 
+class NewUsername(BaseModel):
+    name: str
+    token: str
+
+
+class NewPassword(BaseModel):
+    password: str
+    token: str
+
+
+class NewEmail(BaseModel):
+    email_token: str
+    user_token: str
+
+
 class Login(BaseModel):
     email: str
     password: str

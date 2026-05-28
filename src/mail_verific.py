@@ -26,7 +26,7 @@ def send_code(email: str) -> str:
             server.login(sender, mail_password)
             server.send_message(msg)
             vercodes[vercode] = email
-            return "sent"
+            return "ok"
     except Exception as e:
         return "Error: {e}"
 
