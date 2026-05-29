@@ -7,8 +7,10 @@ import mail_verific
 import tokens
 import bcrypt
 
-app = FastAPI()
+from scheduler import start_scheduler
 
+app = FastAPI()
+start_scheduler()
 
 # Создание кода подтверждения
 @app.get("/verification-code")
@@ -170,3 +172,20 @@ def update(upditems:UPDItems):
          return {"message": "bad token"}
     
     return {"message": db.update_items(payload["user_id"], upditems.items_upd)}
+
+# Пуш-токены
+@app.post("/notifications/tokens")
+def notification_tokens(tokens_N: NotificationTokens):
+    payload = tokens.verify(tokens_N.token)
+    if not payload or not payload.get("user_id", None):
+        return {"message":"bad token"}
+    
+    user_id = payload["user_id"]
+
+    res = db.save_user_notification_tokens(
+        user_id = user_id,
+        web_token = tokens_N.web_token,
+        tel_token = tokens_N.tel_token,
+        email_notification= tokens_N.email_notification
+    )
+    return {"message":res}

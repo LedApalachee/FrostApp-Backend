@@ -50,3 +50,9 @@ class UPDItems(BaseModel):
 class CodeVerification(BaseModel):
     email: str
     code: str
+
+class NotificationTokens(BaseModel):
+    token: str
+    web_token: str | None = None
+    tel_token: str | None = None
+    email_notification: bool = True
