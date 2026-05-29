@@ -1,1 +1,13 @@
 *.code-workspace
+__pycache__
+.env
+.venv
+.postman
+postman
+*.db
+src/*.db
+.DS_Store
+aisrc/*.json
+data
+firebase_key.json
+*.pem
