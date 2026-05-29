@@ -27,7 +27,7 @@ class User(Base):
 
     products = relationship("Product", back_populates="user")
     history = relationship("Histories", back_populates="user")
-
+    notifications = relationship("Notification", back_populates="user")
 
 class Product(Base):
     __tablename__ = "products"
@@ -42,7 +42,6 @@ class Product(Base):
 
     user = relationship("User", back_populates="products")
 
-
 class Histories(Base):
     __tablename__ = "history"
     id = Column(Integer, primary_key=True)
@@ -51,6 +50,16 @@ class Histories(Base):
     fp = Column(Integer, nullable=False, unique=True) # ФПД чека, по нему проверяем уникальность - не допускаем дублей
 
     user = relationship("User", back_populates="history")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    web_token = Column(String,default=None)
+    tel_token = Column(String,default=None)
+    email_notification = Column(Boolean, default=False)
+
+    user = relationship("User",back_populates="notifications")
 
 
 Base.metadata.create_all(engine)
@@ -265,6 +274,32 @@ def add_qr(user_id: int, qrraw: str, fp: int):
     except:
         session.rollback()
         return "undefined error"
+
+
+def save_user_notification_tokens (user_id:int,web_token:str,tel_token:str,email_notification: bool):
+    try:
+        setting = session.query(Notification).filter(Notification.user_id == user_id).first()
+
+        if setting:
+            if web_token is not None:
+                setting.web_token = web_token
+            if tel_token is not None:
+                setting.tel_token = tel_token
+            setting.email_notification = email_notification
+        else:
+            setting = Notification(
+                user_id=user_id,
+                web_token=web_token,
+                tel_token=tel_token,
+                email_notification=email_notification
+            )
+            session.add(setting)
+            
+        session.commit()
+        return "ok"
+    except Exception as e:
+        session.rollback()
+        return f"error: {e}" 
 
 
 def all_users():
