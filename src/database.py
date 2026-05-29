@@ -48,6 +48,7 @@ class Histories(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     qr = Column(String, nullable=False)
+    fp = Column(Integer, nullable=False, unique=True) # ФПД чека, по нему проверяем уникальность - не допускаем дублей
 
     user = relationship("User", back_populates="history")
 
@@ -156,7 +157,7 @@ def add_items(user_id: int, items: list):
         session.add(new_product)
 
     session.commit()
-    return "success"
+    return "ok"
 
 
 def get_items(user_id: int) -> list:
@@ -229,14 +230,46 @@ def update_items(user_id: int, items_upd: list) -> str:
     return f"{updated_count} items updated"
 
 
-"""
-def check_all_users_in_db():
+def get_qrs(user_id: int) -> list:
+    qrs = session.query(Histories).filter(Histories.user_id == user_id).all()
+    result = []
+    for qr in qrs:
+        result.append(
+            {
+                "id": qr.id,
+                "qrraw": qr.qr,
+                "fp": qr.fp
+            }
+        )
+    return result
+
+
+def add_qr(user_id: int, qrraw: str, fp: int):
+    user = get_user(user_id)
+    if not user:
+        return "user not found"
+    
+    new_qr = Histories(
+        user_id = user_id,
+        qr = qrraw,
+        fp = fp
+    )
+    session.add(new_qr)
+
+    try:
+        session.commit()
+        return "ok"
+    except IntegrityError:
+        session.rollback()
+        return "exists"
+    except:
+        session.rollback()
+        return "undefined error"
+
+
+def all_users():
     users = session.query(User).all()
     print("\n=== СПИСОК ВСЕХ ПОЛЬЗОВАТЕЛЕЙ В БД ===")
     for u in users:
-        print(u.id, u.user_name, u.email)
+        print(u.id, u.user_name, u.email, u.password)
     print("======================================\n")
-
-
-check_all_users_in_db()
-"""
