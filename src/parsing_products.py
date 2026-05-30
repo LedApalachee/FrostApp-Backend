@@ -34,7 +34,8 @@ def extract_unit(products) -> list:
         else:
             unit = "шт"
             name = product["name"]
+        price = product["price"]
 
-        result.append({"name": name, "quantity": quantity, "unit": unit})
+        result.append({"name": name, "quantity": quantity, "unit": unit, "price": price})
 
     return result

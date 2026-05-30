@@ -1,13 +1,12 @@
 import os
 import requests
-import database as db
 from dotenv import load_dotenv
 
 load_dotenv()
 api_key = os.getenv("API_KEY")
 api_url = os.getenv("API_URL")
 
-# Во-первых как-будто для чистоты кода, сам словарь ошибок должен быть вне функции
+# Ошибки, возвращаемые с API proverkacheka.com
 # "неопределенная ошибка" - остальные случаи
 error_dict = {
     0: "чек некорректен",
@@ -19,19 +18,18 @@ error_dict = {
 error_oth = "неопределенная ошибка"
 
 
-def get_items_by_qrraw(qrraw: str) -> dict:
+def parse(qrraw: str) -> dict:
     rbody = {"token": api_key, "qrraw": qrraw}
-    # try и catch как будто надо
+    
     try:
         r = requests.post(api_url, data=rbody).json()
     except Exception:
-        return {"successful": False, "errorname": "ошибка сети или не верный JSON"}
-    # обработка кодов ошибок с API proverkacheka.com
-    # errors = ["чек некорректен", "успешно", "данные чека пока не получены", "превышено кол-во запросов", "ожидание перед повторным запросом", "неопределенная ошибка"]
+        return {"ok": False, "errorname": "ошибка сети или не верный JSON"}
+    
     code = r.get("code")
     if code != 1:
         error_text = error_dict.get(code, error_oth)
-        return {"successful": False, "errorname": error_text}
+        return {"ok": False, "errorname": error_text}
 
     items = []
     raw_items = r.get("data", {}).get("json", {}).get("items", [])
@@ -40,6 +38,7 @@ def get_items_by_qrraw(qrraw: str) -> dict:
             {
                 "name": item.get("name", "Неопознанный товар"),
                 "quantity": item.get("quantity", 1.0),
+                "price": item.get("price", 0) / 100.0
             }
         )
-    return {"successful": True, "items": items}
+    return {"ok": True, "items": items, "fp": r["data"]["json"]["fiscalSign"], "data": r["data"]["json"]}

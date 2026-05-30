@@ -144,14 +144,30 @@ def scan_qrtext(qrdata: QRText):
     if not payload or not payload.get("user_id", None):
          return {"message": "bad token"}
     
-    res = qr.get_items_by_qrraw(qrdata.qrraw)
-    if res["successful"]:
+    res = qr.parse(qrdata.qrraw)
+    if res["ok"]:
+        db_res = db.add_qr(payload["user_id"], qrdata.qrraw, res["fp"])
+
         return {
             "message": "ok",
+            "db_response": db_res,
             "items": parsing_products.extract_unit(res["items"]),
         }
     else:
         return {"message": res["errorname"]}
+
+
+# Достать историю покупок
+@app.get("/purchases")
+def get_qrs(token: str):
+    payload = tokens.verify(token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+    
+    return {
+        "message": "ok",
+        "purchases": db.get_qrs(payload["user_id"])
+    }
 
 
 # Удалить указанные продукты
