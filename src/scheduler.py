@@ -183,4 +183,4 @@ def start_scheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(check_expiration_dates, "interval", hours=24)
     scheduler.start()
-    print("[Планировщик] Успешно запущен и проверяет базу каждые 60 секунд.")
+    print("[Планировщик] Успешно запущен и проверяет базу каждые 24 часа.")

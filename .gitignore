@@ -9,3 +9,5 @@ src/*.db
 .DS_Store
 aisrc/*.json
 data
+firebase_key.json
+*.pem
