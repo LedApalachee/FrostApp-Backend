@@ -50,3 +50,8 @@ class UPDItems(BaseModel):
 class CodeVerification(BaseModel):
     email: str
     code: str
+
+
+class RecipeGenerate(BaseModel):
+    user_products: list[dict]
+    token: str

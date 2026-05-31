@@ -6,8 +6,15 @@ from rest_models import *
 import mail_verific
 import tokens
 import bcrypt
+import json
+import httpx
+import os
 
 app = FastAPI()
+
+@app.on_event("startup")
+def startup():
+    db.seed_recipes_if_empty()
 
 
 # Создание кода подтверждения
@@ -170,3 +177,157 @@ def update(upditems:UPDItems):
          return {"message": "bad token"}
     
     return {"message": db.update_items(payload["user_id"], upditems.items_upd)}
+
+
+# Получить все рецепты
+@app.get("/recipes")
+def get_recipes(token: str):
+    payload = tokens.verify(token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+
+    user_items = db.get_items(payload["user_id"])
+    user_categories = set()
+    for item in user_items:
+        if item.get("category"):
+            user_categories.add(item["category"])
+
+    recipes = db.get_recipes()
+    result = []
+    for r in recipes:
+        ingredients = json.loads(r["ingredients_json"])
+        matched = 0
+        total = 0
+        missing = []
+        for ing in ingredients:
+            if ing.get("optional"):
+                continue
+            total += 1
+            ing_name_lower = ing["name"].lower()
+            ing_cat_lower = ing["category"].lower()
+            found = False
+            for item in user_items:
+                if item["name"].lower() == ing_name_lower:
+                    found = True
+                    break
+                if item.get("category") and item["category"].lower() == ing_cat_lower:
+                    found = True
+                    break
+            if found:
+                matched += 1
+            else:
+                missing.append(ing["name"])
+
+        match_percent = int((matched / total * 100)) if total > 0 else 0
+        r["match_percent"] = match_percent
+        r["missing_ingredients"] = missing
+        r["ingredients"] = ingredients
+        result.append(r)
+
+    result.sort(key=lambda x: x["match_percent"], reverse=True)
+    return {"message": "ok", "recipes": result}
+
+
+# Засидить рецепты (одноразово)
+@app.post("/recipes/seed")
+def seed_recipes():
+    db.seed_recipes_if_empty()
+    return {"message": "ok"}
+
+
+# Сгенерировать рецепт через AI
+@app.post("/recipes/generate")
+async def generate_recipe(req: RecipeGenerate):
+    payload = tokens.verify(req.token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+
+    products_list = [f"- {p.get('name', '')} ({p.get('category', '')})" for p in req.user_products]
+    products_text = "\n".join(products_list) if products_list else "Нет продуктов"
+
+    api_key = os.environ.get("FIREWORKS_API_KEY", "")
+    if not api_key:
+        return {"message": "error: FIREWORKS_API_KEY not configured"}
+
+    prompt = f"""Ты — генератор рецептов. У пользователя есть следующие продукты:
+{products_text}
+
+Придумай 3 разных рецепта, которые можно приготовить из этих продуктов.
+Ответь СТРОГО валидным JSON объектом. Никакого текста до или после JSON. Никаких markdown-блоков.
+
+Формат JSON:
+{{
+    "recipes": [
+        {{
+            "name": "Название",
+            "description": "Описание",
+            "icon": "🍲",
+            "cook_time_minutes": 30,
+            "servings": 2,
+            "ingredients": [
+                {{"name": "Продукт", "category": "Категория", "quantity": "Кол-во", "optional": false}}
+            ],
+            "instructions": "Шаг 1. Шаг 2."
+        }}
+    ]
+}}
+
+Категории: Молочное, Мясо, Рыба, Овощи, Фрукты, Бакалея, Напитки, Замороженное, Соусы и приправы, Прочее.
+Если ингредиента нет у пользователя, ставь "optional": true."""
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                "https://api.fireworks.ai/inference/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "fireworks/deepseek-v4-flash",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.8,
+                    "max_tokens": 4000,
+                    "response_format": {"type": "json_object"},
+                },
+            )
+            data = response.json()
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+
+            import re
+            try:
+                response_json = json.loads(content)
+            except json.JSONDecodeError:
+                json_match = re.search(r'\{[\s\S]*\}', content)
+                if json_match:
+                    try:
+                        response_json = json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        return {"message": f"error: AI returned malformed JSON. Raw: {content[:300]}"}
+                else:
+                    return {"message": f"error: invalid AI response. Raw: {content[:300]}"}
+
+            recipes_list = response_json.get("recipes", [])
+            if not recipes_list:
+                return {"message": "error: no recipes in AI response"}
+
+            added_ids = []
+            added_recipes = []
+            for r in recipes_list:
+                recipe_id = db.add_recipe(
+                    name=r.get("name", "AI Рецепт"),
+                    description=r.get("description", ""),
+                    icon=r.get("icon", "🤖"),
+                    cook_time=r.get("cook_time_minutes", 30),
+                    servings=r.get("servings", 2),
+                    ingredients_json=json.dumps(r.get("ingredients", [])),
+                    instructions=r.get("instructions", ""),
+                    is_ai=True,
+                )
+                if recipe_id > 0:
+                    added_ids.append(recipe_id)
+                    added_recipes.append(r)
+
+            return {"message": "ok", "recipe_ids": added_ids, "recipes": added_recipes}
+    except Exception as e:
+        return {"message": f"error: {str(e)}"}
