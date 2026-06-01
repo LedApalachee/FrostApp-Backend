@@ -97,7 +97,7 @@ def find_by_email(email: str):
 
 def create_user(username: str, email: str, passhash: str):
     try:
-        new_user = User(user_name=username.lower(), email=email, password=passhash)
+        new_user = User(user_name=username, email=email.lower(), password=passhash)
         session.add(new_user)
         session.commit()
         return new_user.id
@@ -128,6 +128,9 @@ def update_user(user_id: int, newdata: dict):
 
     if not user:
         return "user not found"
+
+    if "email" in newdata and newdata["email"]:
+        newdata["email"] = newdata["email"].lower()
 
     try:
         session.query(User).filter(User.id == user_id).update(newdata)
@@ -327,17 +330,19 @@ def get_recipes() -> list:
     recipes = session.query(Recipe).all()
     result = []
     for r in recipes:
-        result.append({
-            "id": r.id,
-            "name": r.name,
-            "description": r.description,
-            "icon": r.icon,
-            "cook_time_minutes": r.cook_time_minutes,
-            "servings": r.servings,
-            "ingredients_json": r.ingredients_json,
-            "instructions": r.instructions,
-            "is_ai_generated": r.is_ai_generated,
-        })
+        result.append(
+            {
+                "id": r.id,
+                "name": r.name,
+                "description": r.description,
+                "icon": r.icon,
+                "cook_time_minutes": r.cook_time_minutes,
+                "servings": r.servings,
+                "ingredients_json": r.ingredients_json,
+                "instructions": r.instructions,
+                "is_ai_generated": r.is_ai_generated,
+            }
+        )
     return result
 
 
@@ -345,7 +350,7 @@ def get_recipe(id: int):
     recipe = session.query(Recipe).filter(Recipe.id == id).first()
     if not recipe:
         return None
-    
+
     return {
         "id": recipe.id,
         "name": recipe.name,
@@ -355,11 +360,20 @@ def get_recipe(id: int):
         "servings": recipe.servings,
         "ingredients_json": recipe.ingredients_json,
         "instructions": recipe.instructions,
-        "is_ai_generated": recipe.is_ai_generated
+        "is_ai_generated": recipe.is_ai_generated,
     }
 
 
-def add_recipe(name: str, description: str, icon: str, cook_time: int, servings: int, ingredients_json: str, instructions: str, is_ai: bool = False):
+def add_recipe(
+    name: str,
+    description: str,
+    icon: str,
+    cook_time: int,
+    servings: int,
+    ingredients_json: str,
+    instructions: str,
+    is_ai: bool = False,
+):
     try:
         new_recipe = Recipe(
             name=name,
