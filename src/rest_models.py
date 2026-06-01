@@ -51,8 +51,20 @@ class CodeVerification(BaseModel):
     email: str
     code: str
 
+
 class NotificationTokens(BaseModel):
     token: str
     web_token: str | None = None
     tel_token: str | None = None
     email_notification: bool = True
+
+
+class NewRecipe(BaseModel):
+    token: str
+    name: str
+    description: str
+    icon: str
+    cook_time_minutes: int
+    servings: int
+    ingredients_json: str
+    instructions: str

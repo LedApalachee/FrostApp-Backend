@@ -6,7 +6,7 @@ from rest_models import *
 import mail_verific
 import tokens
 import bcrypt
-
+import json
 from scheduler import start_scheduler
 
 app = FastAPI()
@@ -137,6 +137,26 @@ def add_items(newitems: NewItems):
     return {"message": "ok"}
 
 
+# Удалить указанные продукты
+@app.put("/items/delete")
+def delete_items(dropitems: DropItems):
+    payload = tokens.verify(dropitems.token)
+    if not payload or not payload.get("user_id", None):
+         return {"message": "bad token"}
+    
+    return {"message": db.items_to_delete(payload["user_id"],dropitems.item_ids)}
+
+
+# Обновление данных продуктов
+@app.put("/items")
+def update(upditems:UPDItems):
+    payload = tokens.verify(upditems.token)
+    if not payload or not payload.get("user_id", None):
+         return {"message": "bad token"}
+    
+    return {"message": db.update_items(payload["user_id"], upditems.items_upd)}
+
+
 # Сканировать QR-код этого пользователя
 @app.post("/qr-text")
 def scan_qrtext(qrdata: QRText):
@@ -170,25 +190,6 @@ def get_qrs(token: str):
     }
 
 
-# Удалить указанные продукты
-@app.post("/items/delete")
-def delete_items(dropitems: DropItems):
-    payload = tokens.verify(dropitems.token)
-    if not payload or not payload.get("user_id", None):
-         return {"message": "bad token"}
-    
-    return {"message": db.items_to_delete(payload["user_id"],dropitems.item_ids)}
-
-
-# Обновление данных продуктов
-@app.put("/items")
-def update(upditems:UPDItems):
-    payload = tokens.verify(upditems.token)
-    if not payload or not payload.get("user_id", None):
-         return {"message": "bad token"}
-    
-    return {"message": db.update_items(payload["user_id"], upditems.items_upd)}
-
 # Пуш-токены
 @app.post("/notifications/tokens")
 def notification_tokens(tokens_N: NotificationTokens):
@@ -205,3 +206,108 @@ def notification_tokens(tokens_N: NotificationTokens):
         email_notification= tokens_N.email_notification
     )
     return {"message":res}
+
+
+# Получить заголовки всех рецептов
+@app.get("/recipes/general")
+def get_recipe_headers(token: str):
+    payload = tokens.verify(token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+    
+    recipes = db.get_recipes()
+    result = []
+    for recipe in recipes:
+        result.append({
+            "id": recipe["id"],
+            "name": recipe["name"],
+            "description": recipe["description"],
+            "icon": recipe["icon"]
+        })
+    
+    return {"message": "ok", "recipes": result}
+
+
+# Получить конкретный рецепт
+@app.get("/recipes/specific")
+def get_specific_recipe(token: str, recipe_id: int):
+    payload = tokens.verify(token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+
+    recipe = db.get_recipe(recipe_id)
+    if not recipe:
+        return {"message": "recipe not found"}
+    
+    try:
+        ingredients = json.loads(recipe["ingredients_json"])
+    except:
+        ingredients = None
+    recipe.pop("ingredients_json")
+    recipe.update({"ingredients": ingredients})
+    
+    return {"message": "ok", "recipe": recipe}
+
+
+# Получить все рецепты
+@app.get("/recipes")
+def get_recipes(token: str):
+    payload = tokens.verify(token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+
+    user_items = db.get_items(payload["user_id"])
+    user_categories = set()
+    for item in user_items:
+        if item.get("category", None):
+            user_categories.add(item["category"])
+
+    recipes = db.get_recipes()
+    result = []
+    for r in recipes:
+        try:
+            ingredients = json.loads(r["ingredients_json"])
+        except:
+            ingredients = None
+        r.pop("ingredients_json")
+        matched = 0
+        total = 0
+        missing = []
+        ingredients_list = [] if ingredients == None else ingredients
+        for ing in ingredients_list:
+            if ing.get("optional", None):
+                continue
+            total += 1
+            ing_name_lower = ing["name"].lower()
+            ing_cat_lower = ing["category"].lower()
+            found = False
+            for item in user_items:
+                if item["name"].lower() == ing_name_lower and not item["deleted"]:
+                    found = True
+                    break
+                if item.get("category", None) and item["category"].lower() == ing_cat_lower and not item["deleted"]:
+                    found = True
+                    break
+            if found:
+                matched += 1
+            else:
+                missing.append(ing["name"])
+
+        match_percent = int((matched / total * 100)) if total > 0 else 0
+        r["match_percent"] = match_percent
+        r["missing_ingredients"] = missing
+        r["ingredients"] = ingredients
+        result.append(r)
+
+    result.sort(key=lambda x: x["match_percent"], reverse=True)
+    return {"message": "ok", "recipes": result}
+
+
+# Добавить рецепт
+@app.post("/recipes")
+def add_recipe(recipe: NewRecipe):
+    payload = tokens.verify(recipe.token)
+    if not payload or not payload.get("is_dev", None):
+        return {"message": "bad token"}
+    
+    return {"message": db.add_recipe(recipe.name, recipe.description, recipe.icon, recipe.cook_time_minutes, recipe.servings, recipe.ingredients_json, recipe.instructions)}

@@ -67,6 +67,19 @@ class Notification(Base):
     user = relationship("User", back_populates="notifications")
 
 
+class Recipe(Base):
+    __tablename__ = "recipes"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    icon = Column(String, default="🍽️")
+    cook_time_minutes = Column(Integer, default=30)
+    servings = Column(Integer, default=2)
+    ingredients_json = Column(String, nullable=False)  # JSON строка
+    instructions = Column(String, nullable=False)
+    is_ai_generated = Column(Boolean, default=False)
+
+
 Base.metadata.create_all(engine)
 
 
@@ -308,3 +321,59 @@ def all_users():
     for u in users:
         print(u.id, u.user_name, u.email, u.password)
     print("======================================\n")
+
+
+def get_recipes() -> list:
+    recipes = session.query(Recipe).all()
+    result = []
+    for r in recipes:
+        result.append({
+            "id": r.id,
+            "name": r.name,
+            "description": r.description,
+            "icon": r.icon,
+            "cook_time_minutes": r.cook_time_minutes,
+            "servings": r.servings,
+            "ingredients_json": r.ingredients_json,
+            "instructions": r.instructions,
+            "is_ai_generated": r.is_ai_generated,
+        })
+    return result
+
+
+def get_recipe(id: int):
+    recipe = session.query(Recipe).filter(Recipe.id == id).first()
+    if not recipe:
+        return None
+    
+    return {
+        "id": recipe.id,
+        "name": recipe.name,
+        "description": recipe.description,
+        "icon": recipe.icon,
+        "cook_time_minutes": recipe.cook_time_minutes,
+        "servings": recipe.servings,
+        "ingredients_json": recipe.ingredients_json,
+        "instructions": recipe.instructions,
+        "is_ai_generated": recipe.is_ai_generated
+    }
+
+
+def add_recipe(name: str, description: str, icon: str, cook_time: int, servings: int, ingredients_json: str, instructions: str, is_ai: bool = False):
+    try:
+        new_recipe = Recipe(
+            name=name,
+            description=description,
+            icon=icon,
+            cook_time_minutes=cook_time,
+            servings=servings,
+            ingredients_json=ingredients_json,
+            instructions=instructions,
+            is_ai_generated=is_ai,
+        )
+        session.add(new_recipe)
+        session.commit()
+        return "ok"
+    except Exception as e:
+        session.rollback()
+        return f"error: {e}"
