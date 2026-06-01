@@ -85,6 +85,22 @@ def update_user(user: NewUsername):
     
     return {"message":  db.update_user(payload["user_id"], {"user_name": user.name})}
 
+@app.put("/users/password/authorized")
+def update_user(user: NewPassword):
+    payload = tokens.verify(user.token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+    
+    userdb = db.get_user(payload["user_id"])
+    if not userdb:
+        return {"message": "user not found"}
+    return {
+        "message": db.update_user(
+            userdb["id"],
+            {"password": bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())}
+        )
+    }
+
 @app.put("/users/password")
 def update_user(user: NewPassword):
     payload = tokens.verify(user.token)
