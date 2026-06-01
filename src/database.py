@@ -29,6 +29,7 @@ class User(Base):
     history = relationship("Histories", back_populates="user")
     notifications = relationship("Notification", back_populates="user")
 
+
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True)
@@ -42,24 +43,28 @@ class Product(Base):
 
     user = relationship("User", back_populates="products")
 
+
 class Histories(Base):
     __tablename__ = "history"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     qr = Column(String, nullable=False)
-    fp = Column(Integer, nullable=False, unique=True) # ФПД чека, по нему проверяем уникальность - не допускаем дублей
+    fp = Column(
+        Integer, nullable=False, unique=True
+    )  # ФПД чека, по нему проверяем уникальность - не допускаем дублей
 
     user = relationship("User", back_populates="history")
+
 
 class Notification(Base):
     __tablename__ = "notifications"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
-    web_token = Column(String,default=None)
-    tel_token = Column(String,default=None)
+    web_token = Column(String, default=None)
+    tel_token = Column(String, default=None)
     email_notification = Column(Boolean, default=False)
 
-    user = relationship("User",back_populates="notifications")
+    user = relationship("User", back_populates="notifications")
 
 
 Base.metadata.create_all(engine)
@@ -79,7 +84,7 @@ def find_by_email(email: str):
 
 def create_user(username: str, email: str, passhash: str):
     try:
-        new_user = User(user_name=username, email=email, password=passhash)
+        new_user = User(user_name=username.lower(), email=email, password=passhash)
         session.add(new_user)
         session.commit()
         return new_user.id
@@ -95,21 +100,22 @@ def get_user(user_id: int):
     user = session.query(User).filter(User.id == user_id).first()
     if not user:
         return None
-    return {"id": user.id, "name": user.user_name, "email": user.email, "password": user.password}
+    return {
+        "id": user.id,
+        "name": user.user_name,
+        "email": user.email,
+        "password": user.password,
+    }
 
 
 def update_user(user_id: int, newdata: dict):
-    newdata.pop("id", None) # id менять нельзя
-    
-    user = (
-        session.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    newdata.pop("id", None)  # id менять нельзя
+
+    user = session.query(User).filter(User.id == user_id).first()
 
     if not user:
         return "user not found"
-    
+
     try:
         session.query(User).filter(User.id == user_id).update(newdata)
         session.commit()
@@ -243,13 +249,7 @@ def get_qrs(user_id: int) -> list:
     qrs = session.query(Histories).filter(Histories.user_id == user_id).all()
     result = []
     for qr in qrs:
-        result.append(
-            {
-                "id": qr.id,
-                "qrraw": qr.qr,
-                "fp": qr.fp
-            }
-        )
+        result.append({"id": qr.id, "qrraw": qr.qr, "fp": qr.fp})
     return result
 
 
@@ -257,12 +257,8 @@ def add_qr(user_id: int, qrraw: str, fp: int):
     user = get_user(user_id)
     if not user:
         return "user not found"
-    
-    new_qr = Histories(
-        user_id = user_id,
-        qr = qrraw,
-        fp = fp
-    )
+
+    new_qr = Histories(user_id=user_id, qr=qrraw, fp=fp)
     session.add(new_qr)
 
     try:
@@ -276,9 +272,13 @@ def add_qr(user_id: int, qrraw: str, fp: int):
         return "undefined error"
 
 
-def save_user_notification_tokens (user_id:int,web_token:str,tel_token:str,email_notification: bool):
+def save_user_notification_tokens(
+    user_id: int, web_token: str, tel_token: str, email_notification: bool
+):
     try:
-        setting = session.query(Notification).filter(Notification.user_id == user_id).first()
+        setting = (
+            session.query(Notification).filter(Notification.user_id == user_id).first()
+        )
 
         if setting:
             if web_token is not None:
@@ -291,15 +291,15 @@ def save_user_notification_tokens (user_id:int,web_token:str,tel_token:str,email
                 user_id=user_id,
                 web_token=web_token,
                 tel_token=tel_token,
-                email_notification=email_notification
+                email_notification=email_notification,
             )
             session.add(setting)
-            
+
         session.commit()
         return "ok"
     except Exception as e:
         session.rollback()
-        return f"error: {e}" 
+        return f"error: {e}"
 
 
 def all_users():
