@@ -7,6 +7,8 @@ import mail_verific
 import tokens
 import bcrypt
 import json
+import httpx
+import os
 from scheduler import start_scheduler
 
 app = FastAPI()
@@ -327,3 +329,75 @@ def add_recipe(recipe: NewRecipe):
         return {"message": "bad token"}
     
     return {"message": db.add_recipe(recipe.name, recipe.description, recipe.icon, recipe.cook_time_minutes, recipe.servings, recipe.ingredients_json, recipe.instructions)}
+
+
+# Сгенерировать рецепт через AI
+@app.post("/recipes/generate")
+async def generate_recipe(req: RecipeGenerate):
+    payload = tokens.verify(req.token)
+    if not payload or not payload.get("user_id", None):
+        return {"message": "bad token"}
+
+    products_list = [f"- {p.get('name', '')} ({p.get('category', '')})" for p in req.user_products]
+    products_text = "\n".join(products_list) if products_list else "Нет продуктов"
+
+    api_key = os.environ.get("FIREWORKS_API_KEY", "")
+    if not api_key:
+        return {"message": "error: FIREWORKS_API_KEY not configured"}
+
+    prompt = f"""У пользователя есть следующие продукты:
+{products_text}
+
+Придумай рецепт, который можно приготовить из этих продуктов (или из большинства из них).
+Ответь СТРОГО в формате JSON с полями:
+- name: название рецепта (строка)
+- description: краткое описание (строка)
+- icon: эмодзи (строка, один эмодзи)
+- cook_time_minutes: время приготовления в минутах (число)
+- servings: количество порций (число)
+- ingredients: массив объектов с полями name, category, quantity, optional (boolean)
+- instructions: пошаговая инструкция (строка, шаги разделены точками)
+
+Категории ингредиентов должны быть из списка: Молочное, Мясо, Рыба, Овощи, Фрукты, Бакалея, Напитки, Замороженное, Соусы и приправы, Прочее.
+Если какого-то продукта нет у пользователя, пометь его как optional: true."""
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            print("bp 1")
+            response = await client.post(
+                "https://api.fireworks.ai/inference/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "accounts/fireworks/models/deepseek-v4-flash",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.7,
+                    "max_tokens": 1000,
+                },
+            )
+            print("bp 2")
+            data = response.json()
+            content = data["choices"][0]["message"]["content"]
+            print("bp 3")
+
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                recipe_json = json.loads(json_match.group())
+                recipe_id = db.add_recipe(
+                    name=recipe_json.get("name", "AI Рецепт"),
+                    description=recipe_json.get("description", ""),
+                    icon=recipe_json.get("icon", "🤖"),
+                    cook_time=recipe_json.get("cook_time_minutes", 30),
+                    servings=recipe_json.get("servings", 2),
+                    ingredients_json=json.dumps(recipe_json.get("ingredients", [])),
+                    instructions=recipe_json.get("instructions", ""),
+                    is_ai=True,
+                )
+                return {"message": "ok", "recipe_id": recipe_id, "recipe": recipe_json}
+            else:
+                return {"message": "error: invalid AI response"}
+    except Exception as e:
+        return {"message": f"error: {e}"}

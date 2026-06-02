@@ -68,3 +68,8 @@ class NewRecipe(BaseModel):
     servings: int
     ingredients_json: str
     instructions: str
+
+
+class RecipeGenerate(BaseModel):
+    token: str
+    user_products: list[dict]
