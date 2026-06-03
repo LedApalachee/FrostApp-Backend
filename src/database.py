@@ -387,7 +387,7 @@ def add_recipe(
         )
         session.add(new_recipe)
         session.commit()
-        return "ok"
+        return new_recipe.id
     except Exception as e:
         session.rollback()
         return f"error: {e}"
