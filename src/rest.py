@@ -434,7 +434,6 @@ async def generate_recipe(req: RecipeGenerate):
             content = (
                 data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
             )
-            print(content)
 
             import re
 

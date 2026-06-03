@@ -28,7 +28,7 @@ def send_code(email: str) -> str:
             vercodes[vercode] = email
             return "ok"
     except Exception as e:
-        return "Error: {e}"
+        return f"error: {e}"
 
 
 def verify(email: str, vercode: str) -> str | None:
