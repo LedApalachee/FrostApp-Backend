@@ -11,3 +11,5 @@ aisrc/*.json
 data
 firebase_key.json
 *.pem
+*.exe
+.local
